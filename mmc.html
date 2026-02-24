@@ -80,7 +80,7 @@ canvas {
 <body>
 
 <div class="header">
-<h2>GPD eMMC HardWare Professional Monitor</h2>
+<h2>GPD eMMC Hardware Professional Monitor</h2>
 <div style="font-size:13px;color:#94a3b8;">
 温度 > 60°C / ARC > 3GB / 内存 > 80% 需注意
 </div>
@@ -104,8 +104,13 @@ canvas {
 </div>
 
 <div class="card">
-<div class="label">eMMC已使用</div>
+<div class="label">eMMC估算使用率</div>
 <div class="value" id="life_percent"></div>
+</div>
+
+<div class="card">
+<div class="label">eMMC硬件磨损等级</div>
+<div class="value" id="emmc_life"></div>
 </div>
 
 <div class="card">
@@ -148,7 +153,7 @@ canvas {
 <canvas id="chart"></canvas>
 
 <div class="footer">
- Monitoring Dashboard <a href="https://github.com/jarodlee/gpd_mmc_log">github link</a> · Auto refresh every 5s
+Monitoring Dashboard · Auto refresh every 5s
 </div>
 
 <script>
@@ -162,7 +167,7 @@ function initChart() {
         data: {
             labels: [],
             datasets: [{
-                label: 'Total Written (GB)',
+                label: 'Daily Written (GB)',
                 data: [],
                 borderColor: '#2563eb',
                 backgroundColor: 'rgba(37,99,235,0.1)',
@@ -174,7 +179,8 @@ function initChart() {
             responsive: true,
             maintainAspectRatio: false,
             scales: {
-                x: { ticks: { maxTicksLimit: 8 } }
+                x: { ticks: { maxTicksLimit: 8 } },
+                y: { beginAtZero: true }
             }
         }
     });
@@ -188,6 +194,18 @@ function setColor(id, value, warn, danger) {
     else el.classList.add("ok");
 }
 
+function emmcLifeText(level, pre) {
+    if (!level) return "N/A";
+
+    let percentRange = (level - 1) * 10 + "% - " + (level * 10) + "%";
+    let status = "正常";
+
+    if (pre === 2) status = "接近寿命";
+    if (pre === 3) status = "寿命终点";
+
+    return "Level " + level + " (" + percentRange + ") · " + status;
+}
+
 function loadData() {
 fetch('/mmc_data')
 .then(res => res.json())
@@ -197,8 +215,9 @@ document.getElementById("total_tb").innerText = data.total_tb + " TB";
 document.getElementById("today_gb").innerText = data.today_gb + " GB";
 document.getElementById("avg_daily_gb").innerText = data.avg_daily_gb + " GB";
 document.getElementById("life_percent").innerText = data.life_used_percent + " %";
+
 document.getElementById("remaining_years").innerText =
-    data.remaining_years ? data.remaining_years + " 年" : "学习中...";
+    data.remaining_years ? data.remaining_years + " 年" : "计算中...";
 
 document.getElementById("battery").innerText =
     data.battery_percent !== null ?
@@ -219,6 +238,10 @@ document.getElementById("mem").innerText =
 document.getElementById("arc").innerText =
     data.arc_size_gb !== null ? data.arc_size_gb + " GB" : "N/A";
 
+/* eMMC 硬件寿命 */
+document.getElementById("emmc_life").innerText =
+    emmcLifeText(data.emmc_life_level, data.emmc_pre_eol);
+
 /* 颜色分级 */
 if (data.temperature_c !== null)
     setColor("temp", data.temperature_c, 50, 60);
@@ -234,9 +257,7 @@ if (data.today_gb !== null)
 
 /* 更新图表 */
 if (chart) {
-    chart.data.labels = data.history.map(x =>
-        new Date(x.time * 1000).toLocaleTimeString()
-    );
+    chart.data.labels = data.history.map(x => x.date);
     chart.data.datasets[0].data = data.history.map(x => x.gb);
     chart.update();
 }

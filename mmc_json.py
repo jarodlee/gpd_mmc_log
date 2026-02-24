@@ -66,6 +66,41 @@ state = update_write_stats()
 today_gb = state["daily_sector"] * 512 / (1024**3)
 total_tb = state["total_sector"] * 512 / (1024**4)
 
+HISTORY_FILE = "/var/www/mmc/mmc_history.json"
+
+def update_history(today_gb):
+    today = str(datetime.date.today())
+
+    if os.path.exists(HISTORY_FILE):
+        with open(HISTORY_FILE) as f:
+            history = json.load(f)
+    else:
+        history = []
+
+    found = False
+    for item in history:
+        if item["date"] == today:
+            item["gb"] = round(today_gb, 2)
+            found = True
+            break
+
+    if not found:
+        history.append({
+            "date": today,
+            "gb": round(today_gb, 2)
+        })
+
+    # 保留最近30天
+    history = history[-30:]
+
+    with open(HISTORY_FILE, "w") as f:
+        json.dump(history, f)
+
+    return history
+
+history_data = update_history(today_gb)
+
+
 total_days = max((int(time.time()) - state["first_ts"]) / 86400, 1)
 avg_daily_gb = (state["total_sector"] * 512 / (1024**3)) / total_days
 
@@ -85,10 +120,8 @@ history = []  # 单机稳定版不再依赖历史日志
 
 def read_emmc_health():
     try:
-        out = subprocess.check_output(
-            ["mmc", "extcsd", "read", "/dev/mmcblk0"],
-            stderr=subprocess.DEVNULL
-        ).decode()
+        with open("/var/www/mmc/extcsd.log") as f:
+            out = f.read()
 
         life_a = None
         pre_eol = None
@@ -199,7 +232,7 @@ except:
     pass
 
 result = {
-    "history": history,
+    "history": history_data,
     "total_tb": round(total_tb, 2),
     "today_gb": round(today_gb, 2),
     "avg_daily_gb": round(avg_daily_gb, 2),
