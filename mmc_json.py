@@ -84,6 +84,22 @@ try:
 except:
     pass
 
+# ========= MMC 错误监控 =========
+mmc_error = False
+mmc_error_text = None
+
+try:
+    dmesg_output = subprocess.check_output(
+        "dmesg --since '10 minutes ago' | grep -i mmc",
+        shell=True
+    ).decode()
+
+    if "-110" in dmesg_output or "I/O error" in dmesg_output:
+        mmc_error = True
+        mmc_error_text = "Detected mmc error (-110 or I/O error)"
+except:
+    pass
+
 # ========= 无线 IP =========
 wifi_ip = None
 
@@ -101,6 +117,8 @@ except:
     pass
 
 result = {
+    "mmc_error": mmc_error,
+    "mmc_error_text": mmc_error_text,
     "history": history,
     "total_tb": round(total_tb, 2),
     "today_gb": round(today_gb, 2),

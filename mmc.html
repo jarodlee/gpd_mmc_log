@@ -3,37 +3,72 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>eMMC Monitor</title>
+<title>eMMC System Monitor</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
 <style>
-body { font-family: Arial; margin: 20px; }
+body {
+    font-family: Arial, sans-serif;
+    margin: 20px;
+    background: #f9f9f9;
+}
+
+h2 {
+    margin-bottom: 10px;
+}
+
 .card {
     padding: 12px;
-    margin: 10px 0;
-    background: #f4f4f4;
+    margin: 8px 0;
+    background: #ffffff;
     border-radius: 10px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
     font-size: 16px;
 }
-.alert { background: #ffcccc !important; color: red; font-weight: bold; }
+
+.alert {
+    background: #ffcccc !important;
+    color: red;
+    font-weight: bold;
+}
+
+#mcc_alert {
+    display: none;
+}
+
 @media (max-width: 600px) {
-    body { margin: 10px; font-size: 15px; }
+    body {
+        margin: 10px;
+        font-size: 15px;
+    }
 }
 </style>
 </head>
+
 <body>
 
-<h2>eMMC System Monitor</h2><h3><a href="https://github.com/jarodlee/gpd_mmc_log">github link</a></h3>
+<h2>eMMC Professional Monitor</h2>
+<h3><a href="https://github.com/jarodlee/gpd_mmc_log">github link</a></h3>
+
+<div class="card" id="mmc_alert" style="display:none;">
+⚠ MMC ERROR DETECTED (Check dmesg)
+</div>
 
 <div class="card">累计写入: <b id="total_tb"></b> TB</div>
-<div class="card" id="today_card">今日写入: <b id="today_gb"></b> GB</div>
+
+<div class="card" id="today_card">
+今日写入: <b id="today_gb"></b> GB
+</div>
+
 <div class="card">平均每日写入: <b id="avg_daily_gb"></b> GB</div>
 <div class="card">已使用寿命: <b id="life_percent"></b> %</div>
-<div class="card">预计剩余寿命: <b id="remaining_years"></b> 年</div>
+<div class="card">预计剩余寿命: <b id="remaining_years"></b></div>
+
 <div class="card">电池: <b id="battery"></b></div>
-<div class="card">SSD温度: <b id="temp"></b> °C</div>
+<div class="card">温度: <b id="temp"></b> °C</div>
 <div class="card">无线IP: <b id="wifi_ip"></b></div>
 
-<canvas id="chart"></canvas>
+<canvas id="chart" style="margin-top:20px;"></canvas>
 
 <script>
 fetch('/mmc_data')
@@ -44,8 +79,16 @@ fetch('/mmc_data')
     document.getElementById("today_gb").innerText = data.today_gb;
     document.getElementById("avg_daily_gb").innerText = data.avg_daily_gb;
     document.getElementById("life_percent").innerText = data.life_used_percent;
-    document.getElementById("remaining_years").innerText = data.remaining_years;
 
+    if (data.remaining_years !== null) {
+        document.getElementById("remaining_years").innerText =
+            data.remaining_years + " 年";
+    } else {
+        document.getElementById("remaining_years").innerText =
+            "学习中...";
+    }
+
+    // 电池
     if (data.battery_percent !== null) {
         document.getElementById("battery").innerText =
             data.battery_percent + "% (" + data.battery_status + ")";
@@ -53,17 +96,30 @@ fetch('/mmc_data')
         document.getElementById("battery").innerText = "N/A";
     }
 
+    // 温度
     document.getElementById("temp").innerText =
         data.temperature_c !== null ? data.temperature_c : "N/A";
 
+    // WiFi IP
     document.getElementById("wifi_ip").innerText =
         data.wifi_ip !== null ? data.wifi_ip : "N/A";
 
+    // 今日写入告警
     if (data.alert) {
         document.getElementById("today_card").classList.add("alert");
     }
 
-    const labels = data.history.map(x => new Date(x.time*1000).toLocaleString());
+    // MMC 错误告警
+    if (data.mmc_error) {
+        const alertBox = document.getElementById("mmc_alert");
+        alertBox.style.display = "block";
+        alertBox.classList.add("alert");
+    }
+
+    // 图表
+    const labels = data.history.map(x =>
+        new Date(x.time * 1000).toLocaleString()
+    );
     const values = data.history.map(x => x.gb);
 
     new Chart(document.getElementById('chart'), {
@@ -76,8 +132,13 @@ fetch('/mmc_data')
                 fill: false,
                 tension: 0.2
             }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false
         }
     });
+
 });
 </script>
 
