@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>eMMC Professional Monitor</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<style>
+body { font-family: Arial; margin: 40px; }
+.card { padding: 10px; margin: 10px 0; background: #f4f4f4; border-radius: 8px; }
+</style>
+</head>
+<body>
+
+<h2>eMMC Professional Monitor</h2>
+
+<div class="card">累计写入: <b id="total_tb"></b> TB</div>
+<div class="card">今日写入: <b id="today_gb"></b> GB</div>
+<div class="card">平均每日写入: <b id="avg_daily_gb"></b> GB</div>
+<div class="card">已使用寿命: <b id="life_percent"></b> %</div>
+<div class="card">预计剩余寿命: <b id="remaining_years"></b> 年</div>
+
+<canvas id="chart"></canvas>
+
+<script>
+fetch('/mmc_data')
+.then(res => res.json())
+.then(data => {
+
+    document.getElementById("total_tb").innerText = data.total_tb;
+    document.getElementById("today_gb").innerText = data.today_gb;
+    document.getElementById("avg_daily_gb").innerText = data.avg_daily_gb;
+    document.getElementById("life_percent").innerText = data.life_used_percent;
+    document.getElementById("remaining_years").innerText = data.remaining_years;
+
+    const labels = data.history.map(x => new Date(x.time*1000).toLocaleString());
+    const values = data.history.map(x => x.gb);
+
+    new Chart(document.getElementById('chart'), {
+        type: 'line',
+        data: {
+            labels: labels,
+            datasets: [{
+                label: 'Total Written (GB)',
+                data: values,
+                fill: false,
+                tension: 0.1
+            }]
+        }
+    });
+});
+</script>
+
+</body>
+</html>
