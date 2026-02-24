@@ -3,41 +3,153 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>eMMC System Monitor</title>
+<title>GPD Pocket Monitor</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
 <style>
-body { font-family: Arial; margin: 20px; background: #f9f9f9; }
-.card {
-    padding: 12px;
-    margin: 8px 0;
-    background: #fff;
-    border-radius: 10px;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial;
+    margin: 0;
+    background: #f3f6fa;
+    color: #333;
 }
-.alert { background: #ffcccc !important; color: red; font-weight: bold; }
-canvas { margin-top:20px; max-height:300px; }
+
+.header {
+    padding: 20px 30px;
+    background: #1e293b;
+    color: #fff;
+}
+
+.header h2 {
+    margin: 0;
+    font-weight: 500;
+}
+
+.container {
+    padding: 25px;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 18px;
+}
+
+.card {
+    background: #ffffff;
+    border-radius: 14px;
+    padding: 18px;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.06);
+    transition: 0.2s ease;
+}
+
+.card:hover {
+    transform: translateY(-3px);
+}
+
+.label {
+    font-size: 14px;
+    color: #666;
+}
+
+.value {
+    font-size: 22px;
+    font-weight: 600;
+    margin-top: 6px;
+}
+
+.ok { color: #16a34a; }
+.warn { color: #f59e0b; }
+.danger { color: #dc2626; }
+
+canvas {
+    background: #fff;
+    border-radius: 14px;
+    padding: 10px;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.06);
+    margin: 20px 25px;
+    max-height: 320px;
+}
+
+.footer {
+    text-align: center;
+    padding: 15px;
+    font-size: 13px;
+    color: #888;
+}
 </style>
 </head>
+
 <body>
 
-<h2>GPD eMMC Professional Monitor: 注意温度 > 60°C  ARC > 3GB  内存 > 80% </h2>
-<h3><a href="https://github.com/jarodlee/gpd_mmc_log">github link</a></h3>
+<div class="header">
+<h2>GPD eMMC HardWare Professional Monitor</h2>
+<div style="font-size:13px;color:#94a3b8;">
+温度 > 60°C / ARC > 3GB / 内存 > 80% 需注意
+</div>
+</div>
 
-<div class="card">累计写入: <b id="total_tb"></b> TB</div>
-<div class="card" id="today_card">今日写入: <b id="today_gb"></b> GB</div>
-<div class="card">平均每日写入: <b id="avg_daily_gb"></b> GB</div>
-<div class="card">已使用寿命: <b id="life_percent"></b> %</div>
-<div class="card">预计剩余寿命: <b id="remaining_years"></b></div>
+<div class="container">
 
-<div class="card" id="battery_card">电池: <b id="battery"></b></div>
-<div class="card">温度: <b id="temp"></b> °C</div>
-<div class="card">无线IP: <b id="wifi_ip"></b></div>
+<div class="card">
+<div class="label">累计写入</div>
+<div class="value" id="total_tb"></div>
+</div>
 
-<div class="card">CPU 使用率: <b id="cpu"></b> %</div>
-<div class="card">内存使用率: <b id="mem"></b> %</div>
-<div class="card">ZFS ARC 占用: <b id="arc"></b> GB</div>
+<div class="card" id="today_card">
+<div class="label">今日写入</div>
+<div class="value" id="today_gb"></div>
+</div>
+
+<div class="card">
+<div class="label">平均每日写入</div>
+<div class="value" id="avg_daily_gb"></div>
+</div>
+
+<div class="card">
+<div class="label">寿命已使用</div>
+<div class="value" id="life_percent"></div>
+</div>
+
+<div class="card">
+<div class="label">预计剩余寿命</div>
+<div class="value" id="remaining_years"></div>
+</div>
+
+<div class="card" id="battery_card">
+<div class="label">电池状态</div>
+<div class="value" id="battery"></div>
+</div>
+
+<div class="card">
+<div class="label">温度</div>
+<div class="value" id="temp"></div>
+</div>
+
+<div class="card">
+<div class="label">无线 IP</div>
+<div class="value" id="wifi_ip"></div>
+</div>
+
+<div class="card">
+<div class="label">CPU 使用率</div>
+<div class="value" id="cpu"></div>
+</div>
+
+<div class="card">
+<div class="label">内存使用率</div>
+<div class="value" id="mem"></div>
+</div>
+
+<div class="card">
+<div class="label">ZFS ARC 占用</div>
+<div class="value" id="arc"></div>
+</div>
+
+</div>
 
 <canvas id="chart"></canvas>
+
+<div class="footer">
+ Monitoring Dashboard <a href="https://github.com/jarodlee/gpd_mmc_log">github link</a> · Auto refresh every 5s
+</div>
 
 <script>
 
@@ -52,15 +164,28 @@ function initChart() {
             datasets: [{
                 label: 'Total Written (GB)',
                 data: [],
-                fill: false,
-                tension: 0.2
+                borderColor: '#2563eb',
+                backgroundColor: 'rgba(37,99,235,0.1)',
+                fill: true,
+                tension: 0.25
             }]
         },
         options: {
             responsive: true,
-            maintainAspectRatio: false
+            maintainAspectRatio: false,
+            scales: {
+                x: { ticks: { maxTicksLimit: 8 } }
+            }
         }
     });
+}
+
+function setColor(id, value, warn, danger) {
+    const el = document.getElementById(id);
+    el.classList.remove("ok","warn","danger");
+    if (value >= danger) el.classList.add("danger");
+    else if (value >= warn) el.classList.add("warn");
+    else el.classList.add("ok");
 }
 
 function loadData() {
@@ -68,44 +193,49 @@ fetch('/mmc_data')
 .then(res => res.json())
 .then(data => {
 
-document.getElementById("total_tb").innerText = data.total_tb;
-document.getElementById("today_gb").innerText = data.today_gb;
-document.getElementById("avg_daily_gb").innerText = data.avg_daily_gb;
-document.getElementById("life_percent").innerText = data.life_used_percent;
+document.getElementById("total_tb").innerText = data.total_tb + " TB";
+document.getElementById("today_gb").innerText = data.today_gb + " GB";
+document.getElementById("avg_daily_gb").innerText = data.avg_daily_gb + " GB";
+document.getElementById("life_percent").innerText = data.life_used_percent + " %";
 document.getElementById("remaining_years").innerText =
     data.remaining_years ? data.remaining_years + " 年" : "学习中...";
 
-if (data.alert)
-    document.getElementById("today_card").classList.add("alert");
-
-if (data.battery_percent !== null) {
-    document.getElementById("battery").innerText =
-        data.battery_percent + "% (" + data.battery_status + ")";
-    if (data.battery_alert)
-        document.getElementById("battery_card").classList.add("alert");
-} else {
-    document.getElementById("battery").innerText = "N/A";
-}
+document.getElementById("battery").innerText =
+    data.battery_percent !== null ?
+    data.battery_percent + "% (" + data.battery_status + ")" : "N/A";
 
 document.getElementById("temp").innerText =
-    data.temperature_c !== null ? data.temperature_c : "N/A";
+    data.temperature_c !== null ? data.temperature_c + " °C" : "N/A";
 
 document.getElementById("wifi_ip").innerText =
     data.wifi_ip !== null ? data.wifi_ip : "N/A";
 
 document.getElementById("cpu").innerText =
-    data.cpu_usage !== null ? data.cpu_usage : "N/A";
+    data.cpu_usage !== null ? data.cpu_usage + " %" : "N/A";
 
 document.getElementById("mem").innerText =
-    data.mem_used_percent !== null ? data.mem_used_percent : "N/A";
+    data.mem_used_percent !== null ? data.mem_used_percent + " %" : "N/A";
 
 document.getElementById("arc").innerText =
-    data.arc_size_gb !== null ? data.arc_size_gb : "N/A";
+    data.arc_size_gb !== null ? data.arc_size_gb + " GB" : "N/A";
+
+/* 颜色分级 */
+if (data.temperature_c !== null)
+    setColor("temp", data.temperature_c, 50, 60);
+
+if (data.mem_used_percent !== null)
+    setColor("mem", data.mem_used_percent, 70, 80);
+
+if (data.arc_size_gb !== null)
+    setColor("arc", data.arc_size_gb, 2.5, 3);
+
+if (data.today_gb !== null)
+    setColor("today_gb", data.today_gb, 20, 30);
 
 /* 更新图表 */
 if (chart) {
     chart.data.labels = data.history.map(x =>
-        new Date(x.time * 1000).toLocaleString()
+        new Date(x.time * 1000).toLocaleTimeString()
     );
     chart.data.datasets[0].data = data.history.map(x => x.gb);
     chart.update();
