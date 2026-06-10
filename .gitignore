@@ -1,0 +1,8 @@
+*.bak
+*.bak.*
+*.log
+mmc_state.json
+mmc_history.json
+extcsd.log
+mmc_state.lock
+.DS_Store

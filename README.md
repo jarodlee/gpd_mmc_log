@@ -1,227 +1,89 @@
 # gpd_mmc_log
 
-> 🧪 A lightweight eMMC wear monitoring dashboard for early GPD Pocket (eMMC models)  
-> Designed for low write amplification, long-term observation, and experimental use.
+Lightweight GPD eMMC and system status dashboard for an nginx + fcgiwrap setup.
 
----
+This repository mirrors the web files currently deployed on the GPD:
 
-## ⚠ Disclaimer
+- `index.html`: the silver NetOps landing page.
+- `mmc.html`: browser dashboard for eMMC/system status.
+- `mmc_json.py`: Python CGI backend used by `/mmc_data`.
 
-This project is primarily tested on **early GPD Pocket models with eMMC storage**.
+## Current Deployment
 
-Newer GPD devices may use:
-
-- NVMe SSD
-- Different eMMC controllers
-- Different block device paths
-
-Before deployment, verify your device path:
+On the GPD:
 
 ```bash
-lsblk
+/var/www/html/index.html
+/var/www/html/mmc.html
+/var/www/mmc/mmc_json.py
+/usr/local/bin/mmc_json.py -> /var/www/mmc/mmc_json.py
 ```
 
-If your storage device is not `mmcblk0`, adjust accordingly (e.g. `/sys/block/nvme0n1/stat`).
+The nginx endpoint `/mmc_data` is served through `fcgiwrap` and points to
+`/usr/local/bin/mmc_json.py`, which is a symlink to the copy in `/var/www/mmc`.
 
----
+## What It Monitors
 
-## 🎯 Project Goal
+- eMMC device name/model/size
+- daily write amount from `/proc/diskstats`
+- estimated TB written since the local baseline
+- eMMC EXT_CSD health fields, refreshed by a root timer
+- battery status
+- temperature
+- Wi-Fi IP
+- CPU usage
+- memory usage based on `MemAvailable`
+- ZFS ARC size
 
-Build a minimal-impact eMMC monitoring service:
+The backend automatically detects the real non-removable `mmcblk*` disk. This
+matters on the current GPD because the real disk is `mmcblk1`, not `mmcblk0`.
 
-- Ultra-low disk writes
-- Simple architecture
-- Long-term safe logging
-- Web-based visualization (Chart.js)
-- No heavy monitoring stack
+## Remaining Life Estimate
 
-Perfect for:
+The dashboard deliberately avoids showing silly lifetime estimates.
 
-- Experimental Linux setups
-- Small home servers
-- Embedded devices
-- Always-on lab machines
+It uses today's latest write amount as the estimate basis, but only shows a
+specific remaining lifetime when both are true:
 
----
+- normal sample days are at least 30
+- the calculated estimate is not greater than 20 years
 
-## 🧠 Architecture (Low Wear Design)
+Otherwise it displays an explanatory message such as:
 
+```text
+采样正常天数 3/30，暂无可靠估算
 ```
-Every 5 minutes:
-    Read /sys/block/mmcblk0/stat
-            ↓
-    Append 1 line to log file
-            ↓
-    Web page reads log
-            ↓
-    Chart.js renders graph
-```
 
-### 📉 Write Impact
+The eMMC hardware health fields are usually more trustworthy than a long-term
+projection:
 
-| Period | Log Size |
-|--------|----------|
-| Daily  | 288 lines |
-| Yearly | ~100 KB |
-| 5 Years | ~500 KB |
+- `Life Time Estimation A`
+- `Pre EOL information`
 
-Negligible impact on eMMC lifespan.
+## Runtime Files
 
----
-
-## 📦 Stack
-
-- Nginx
-- Python3 (CGI via fcgiwrap)
-- Chart.js
-- Cron
-
-No database required.
-
----
-
-# 🚀 Installation Guide
-
----
-
-## 1️⃣ Create Logger Script
+Runtime state is intentionally not part of the dashboard source:
 
 ```bash
-nano ~/mmc_logger.sh
+/var/www/mmc/mmc_state.json
+/var/www/mmc/mmc_history.json
+/var/www/mmc/extcsd.log
+/var/www/mmc/mmc_state.lock
 ```
+
+## Useful Commands
 
 ```bash
-#!/bin/bash
-
-LOGFILE="/var/log/mmc_stat.log"
-
-TS=$(date +%s)
-STAT=$(cat /sys/block/mmcblk0/stat)
-
-WRITE_SECTORS=$(echo $STAT | awk '{print $7}')
-
-echo "$TS $WRITE_SECTORS" >> $LOGFILE
+curl http://127.0.0.1/mmc_data | python3 -m json.tool
+systemctl status fcgiwrap
+systemctl status mmc-extcsd-refresh.timer
+/usr/local/sbin/update_mmc_extcsd.sh
+nginx -t
 ```
 
-Make it executable:
+## Nginx Snippet
 
-```bash
-chmod +x ~/mmc_logger.sh
-```
-
----
-
-## 2️⃣ Add Cron Job (Every 5 Minutes)
-
-```bash
-crontab -e
-```
-
-Add:
-
-```bash
-*/5 * * * * /home/youruser/mmc_logger.sh
-```
-
-✔ 288 writes per day  
-✔ Extremely low wear  
-
----
-
-## 3️⃣ Install Web Server
-
-```bash
-sudo apt update
-sudo apt install nginx fcgiwrap
-```
-
----
-
-## 4️⃣ Create Web Page
-
-```bash
-sudo nano /var/www/html/mmc.html
-```
-
-```html
-<!DOCTYPE html>
-<html>
-<head>
-    <title>GPD eMMC Monitor</title>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-</head>
-<body>
-<h2>eMMC Total Writes (GB)</h2>
-<canvas id="mmcChart"></canvas>
-
-<script>
-fetch('/mmc_data')
-.then(response => response.json())
-.then(data => {
-    const labels = data.map(d => new Date(d.time * 1000).toLocaleString());
-    const values = data.map(d => d.gb);
-
-    new Chart(document.getElementById('mmcChart'), {
-        type: 'line',
-        data: {
-            labels: labels,
-            datasets: [{
-                label: 'Total Written GB',
-                data: values,
-                fill: false,
-                tension: 0.1
-            }]
-        }
-    });
-});
-</script>
-</body>
-</html>
-```
-
----
-
-## 5️⃣ Create JSON CGI Interface
-
-```bash
-sudo nano /usr/local/bin/mmc_json.py
-```
-
-```python
-#!/usr/bin/env python3
-import json
-
-data = []
-with open("/var/log/mmc_stat.log") as f:
-    lines = f.readlines()
-
-for line in lines:
-    ts, sectors = line.strip().split()
-    sectors = int(sectors)
-    gb = sectors * 512 / (1024**3)
-    data.append({"time": int(ts), "gb": round(gb,2)})
-
-print("Content-Type: application/json\n")
-print(json.dumps(data))
-```
-
-Make executable:
-
-```bash
-sudo chmod +x /usr/local/bin/mmc_json.py
-```
-
----
-
-## 6️⃣ Configure Nginx
-
-Edit:
-
-```bash
-sudo nano /etc/nginx/sites-enabled/default
-```
-
-Inside `server {}` add:
+The GPD currently exposes `/mmc_data` with:
 
 ```nginx
 location /mmc_data {
@@ -230,120 +92,3 @@ location /mmc_data {
     fastcgi_param SCRIPT_FILENAME /usr/local/bin/mmc_json.py;
 }
 ```
-
-Restart:
-
-```bash
-sudo systemctl restart nginx
-```
-
----
-
-## 🌐 Access Dashboard
-
-Open:
-
-```
-http://YOUR_IP/mmc.html
-```
-
-You will see:
-
-- Total written GB
-- Growth trend
-- Write velocity changes
-- Abnormal spikes detection
-
----
-
-# 📊 Data Explanation
-
-From:
-
-```
-/sys/block/mmcblk0/stat
-```
-
-Field 7:
-
-```
-Write sectors
-```
-
-Formula:
-
-```
-Bytes written = sectors × 512
-```
-
-Displayed value:
-
-```
-Total written GB
-```
-
----
-
-# 🧮 Lifespan Estimation (Optional)
-
-Assume eMMC rated TBW:
-
-```
-80 TB
-```
-
-Calculation:
-
-```
-Current Written / 80 TB = Used %
-Remaining = 100% - Used
-```
-
-Safe target:
-
-- < 10 TB per year
-- < 50 TB in 5 years
-
----
-
-# 🔧 Optional Improvements
-
-- Switch cron → systemd timer
-- Add logrotate
-- Add daily delta calculation
-- Add projected lifespan curve
-- Improve UI to dashboard style
-- Add NVMe support auto-detection
-
----
-
-# 💡 Why This Exists
-
-Many lightweight devices (like early GPD Pocket) use eMMC with limited TBW.
-
-This tool provides:
-
-✔ Visibility  
-✔ Trend awareness  
-✔ Early anomaly detection  
-✔ Peace of mind  
-
----
-
-# 📜 License
-
-MIT (or choose your preferred license)
-
----
-
-# 🙌 Final Notes
-
-This project is intentionally simple.
-
-No Prometheus.  
-No database.  
-No heavy monitoring stack.  
-
-Just a clean, long-running, low-impact wear dashboard.
-
-Your eMMC deserves transparency.

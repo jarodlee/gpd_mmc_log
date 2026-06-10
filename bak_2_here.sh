@@ -7,9 +7,9 @@
 # ==========================================
 
 FILES=(
-"/usr/local/bin/mmc_json.py"
+"/var/www/html/index.html"
 "/var/www/html/mmc.html"
-"/var/www/mmc/mmc_state.json"
+"/var/www/mmc/mmc_json.py"
 )
 
 BACKUP_DIR="./.bak_$(date +%Y%m%d_%H%M%S)"
