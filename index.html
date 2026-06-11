@@ -339,7 +339,7 @@
             <div class="machine-row"><span>更新周期</span><strong>终端扫描 5 分钟</strong></div>
           </div>
         </div>
-        <p class="footer">认证账号密码保存在 GPD：/opt/netops-suite/credentials.txt</p>
+        <p class="footer">LibreNMS 应用账号保存在 GPD：/opt/netops-suite/credentials.txt</p>
       </aside>
     </section>
 
@@ -396,7 +396,7 @@ cat /opt/netops-suite/credentials.txt
     </section>
 
     <p class="footer">
-      Tip: 8080/8081/8082/8083/9097 均经过 nginx Basic Auth；页面上的跨端口链接会自动使用当前浏览器访问的 IP 或域名。
+      Tip: nginx 外层登录保护已关闭；LibreNMS 仍使用自己的应用登录。跨端口链接会自动使用当前浏览器访问的 IP 或域名。
     </p>
   </main>
 
